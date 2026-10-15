@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}我的 Flask 部落格{% endblock %}</title>
+    <style>
+        body {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 0 20px;
+            font-family: Arial, sans-serif;
+            line-height: 1.8;
+            color: #333;
+        }
+        nav {
+            display: flex;
+            gap: 20px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 15px;
+        }
+        a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        .post {
+            padding: 15px 0;
+            border-bottom: 1px solid #ddd;
+        }
+        .meta {
+            color: #666;
+            font-size: 14px;
+        }
+        .content {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+        input, textarea {
+            box-sizing: border-box;
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 15px;
+            font: inherit;
+        }
+        button, .button {
+            display: inline-block;
+            padding: 8px 15px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .danger {
+            background: #b91c1c;
+        }
+        .error {
+            color: #b91c1c;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('index') }}">首頁</a>
+        <a href="{{ url_for('create_post') }}">新增文章</a>
+    </nav>
+
+    {% block content %}{% endblock %}
+</body>
+</html>

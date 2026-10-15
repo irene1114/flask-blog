@@ -1,0 +1,28 @@
+
+{% extends "base.html" %}
+
+{% block title %}首頁 - 我的 Flask 部落格{% endblock %}
+
+{% block content %}
+<h1>我的 Flask 部落格</h1>
+<p>歡迎來到我的部落格！</p>
+
+{% for post in posts %}
+<article class="post">
+    <h2>
+        <a href="{{ url_for('post_detail', post_id=post['id']) }}">
+            {{ post['title'] }}
+        </a>
+    </h2>
+    <p class="meta">作者：{{ post['author'] }}</p>
+    <p class="content">{{ post['content'] | truncate(160) }}</p>
+    <a href="{{ url_for('post_detail', post_id=post['id']) }}">
+        閱讀全文
+    </a>
+</article>
+{% else %}
+<p>目前沒有文章，請點擊「新增文章」建立第一篇文章。</p>
+{% endfor %}
+{% endblock %}
+
+

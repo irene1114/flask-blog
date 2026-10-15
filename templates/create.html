@@ -1,0 +1,28 @@
+
+{% extends "base.html" %}
+
+{% block title %}新增文章{% endblock %}
+
+{% block content %}
+<h1>新增文章</h1>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<form method="POST" action="{{ url_for('create_post') }}">
+    <label for="title">文章標題</label>
+    <input id="title" name="title" maxlength="200"
+           value="{{ title }}" required>
+
+    <label for="author">作者</label>
+    <input id="author" name="author" maxlength="100"
+           value="{{ author }}" required>
+
+    <label for="content">文章內容</label>
+    <textarea id="content" name="content"
+              rows="12" required>{{ content }}</textarea>
+
+    <button type="submit">發佈文章</button>
+</form>
+{% endblock %}

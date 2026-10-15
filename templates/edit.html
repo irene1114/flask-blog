@@ -1,0 +1,32 @@
+
+{% extends "base.html" %}
+
+{% block title %}編輯文章{% endblock %}
+
+{% block content %}
+<h1>編輯文章</h1>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<form method="POST"
+      action="{{ url_for('edit_post', post_id=post['id']) }}">
+    <label for="title">文章標題</label>
+    <input id="title" name="title" maxlength="200"
+           value="{{ title }}" required>
+
+    <label for="author">作者</label>
+    <input id="author" name="author" maxlength="100"
+           value="{{ author }}" required>
+
+    <label for="content">文章內容</label>
+    <textarea id="content" name="content"
+              rows="12" required>{{ content }}</textarea>
+
+    <button type="submit">儲存修改</button>
+    <a href="{{ url_for('post_detail', post_id=post['id']) }}">
+        取消
+    </a>
+</form>
+{% endblock %}
