@@ -1,72 +1,166 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}我的 Flask 部落格{% endblock %}</title>
+    <title>{% block title %}作業管理系統{% endblock %}</title>
+
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            max-width: 800px;
+            margin: 0;
+            background: #f4f6fa;
+            color: #243247;
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 960px;
             margin: 40px auto;
             padding: 0 20px;
-            font-family: Arial, sans-serif;
-            line-height: 1.8;
-            color: #333;
         }
+
         nav {
             display: flex;
+            flex-wrap: wrap;
             gap: 20px;
-            border-bottom: 1px solid #ddd;
-            padding-bottom: 15px;
+            margin-bottom: 24px;
         }
+
         a {
-            color: #2563eb;
+            color: #255bc7;
             text-decoration: none;
         }
-        .post {
-            padding: 15px 0;
-            border-bottom: 1px solid #ddd;
+
+        a:hover {
+            text-decoration: underline;
         }
-        .meta {
-            color: #666;
-            font-size: 14px;
+
+        .card {
+            padding: 28px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         }
-        .content {
-            white-space: pre-wrap;
+
+        h1 {
+            margin-top: 0;
+        }
+
+        .description {
+            color: #64748b;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
             overflow-wrap: anywhere;
         }
-        input, textarea {
-            box-sizing: border-box;
+
+        th {
+            background: #eef3fc;
+        }
+
+        .deadline {
+            white-space: nowrap;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+
+        .actions form {
+            margin: 0;
+        }
+
+        label {
             display: block;
+            margin-top: 18px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input {
             width: 100%;
-            padding: 10px;
-            margin: 5px 0 15px;
+            padding: 10px 12px;
+            border: 1px solid #b8c4d6;
+            border-radius: 6px;
             font: inherit;
         }
+
+        input:focus {
+            outline: 2px solid #93b4f7;
+            outline-offset: 2px;
+        }
+
         button, .button {
             display: inline-block;
-            padding: 8px 15px;
-            background: #2563eb;
+            padding: 9px 16px;
+            border: 0;
+            border-radius: 6px;
+            background: #255bc7;
             color: white;
-            border: none;
-            border-radius: 4px;
+            font: inherit;
             cursor: pointer;
         }
-        .danger {
-            background: #b91c1c;
+
+        .button:hover {
+            text-decoration: none;
         }
+
+        .danger {
+            background: #b42332;
+        }
+
+        .form-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 24px;
+        }
+
         .error {
-            color: #b91c1c;
+            padding: 12px;
+            border-radius: 6px;
+            background: #fff0f0;
+            color: #a11825;
+        }
+
+        .empty {
+            padding: 28px 0;
+            color: #64748b;
+            text-align: center;
         }
     </style>
 </head>
-<body>
-    <nav>
-        <a href="{{ url_for('index') }}">首頁</a>
-        <a href="{{ url_for('create_post') }}">新增文章</a>
-    </nav>
 
-    {% block content %}{% endblock %}
+<body>
+    <main class="container">
+        <nav aria-label="主要導覽">
+            <a href="{{ url_for('index') }}">作業列表</a>
+            <a href="{{ url_for('create_assignment') }}">新增作業</a>
+        </nav>
+
+        <section class="card">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
 </body>
 </html>
