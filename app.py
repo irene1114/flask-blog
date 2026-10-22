@@ -1,193 +1,227 @@
 import sqlite3
+from datetime import date
 from pathlib import Path
 
 from flask import (
     Flask,
+    abort,
+    g,
+    redirect,
     render_template,
     request,
-    redirect,
     url_for,
-    abort,
 )
 
 app = Flask(__name__)
 
-DATABASE = Path(__file__).resolve().parent / "blog.db"
+DATABASE = Path(__file__).resolve().parent / "homework.db"
 
 
+# 建立資料庫連線，同一次請求共用同一個連線
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if "db" not in g:
+        g.db = sqlite3.connect(DATABASE)
+        g.db.row_factory = sqlite3.Row
+
+    return g.db
 
 
+# 請求結束後關閉連線
+@app.teardown_appcontext
+def close_db(error=None):
+    db = g.pop("db", None)
+
+    if db is not None:
+        db.close()
+
+
+# 初始化資料表
 def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS posts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                author TEXT NOT NULL,
-                content TEXT NOT NULL
-            )
-        """)
+    db = get_db()
 
-        # 第一次執行且資料表為空時，加入三篇範例文章
-        count = conn.execute(
-            "SELECT COUNT(*) FROM posts"
-        ).fetchone()[0]
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course TEXT NOT NULL,
+            task TEXT NOT NULL,
+            deadline TEXT NOT NULL
+        )
+    """)
 
-        if count == 0:
-            conn.executemany(
-                """
-                INSERT INTO posts (title, author, content)
-                VALUES (?, ?, ?)
-                """,
-                [
-                    (
-                        "我的第一篇文章",
-                        "小明",
-                        "歡迎來到我的 Flask 部落格！"
-                    ),
-                    (
-                        "學習 Flask 的心得",
-                        "小華",
-                        "今天學會使用 templates 呈現網頁。"
-                    ),
-                    (
-                        "Python 學習筆記",
-                        "小美",
-                        "使用 SQLite 儲存部落格文章。"
-                    ),
-                ],
-            )
+    db.commit()
 
 
-def get_post(post_id):
-    with get_db() as conn:
-        post = conn.execute(
-            "SELECT * FROM posts WHERE id = ?",
-            (post_id,),
-        ).fetchone()
+# 取得指定作業，找不到時回傳 404
+def get_assignment(assignment_id):
+    assignment = get_db().execute(
+        "SELECT * FROM assignments WHERE id = ?",
+        (assignment_id,),
+    ).fetchone()
 
-    if post is None:
+    if assignment is None:
         abort(404)
 
-    return post
+    return assignment
 
 
+# 讀取表單並檢查輸入內容
+def validate_form():
+    values = {
+        "course": request.form.get("course", "").strip(),
+        "task": request.form.get("task", "").strip(),
+        "deadline": request.form.get("deadline", "").strip(),
+    }
+
+    if not all(values.values()):
+        return values, "課程名稱、作業名稱及截止日期都必須填寫。"
+
+    if len(values["course"]) > 100:
+        return values, "課程名稱最多只能輸入 100 個字。"
+
+    if len(values["task"]) > 200:
+        return values, "作業名稱最多只能輸入 200 個字。"
+
+    try:
+        # 統一儲存為 YYYY-MM-DD，確保日期排序正確
+        parsed_date = date.fromisoformat(values["deadline"])
+        values["deadline"] = parsed_date.isoformat()
+    except ValueError:
+        return values, "請輸入有效的截止日期。"
+
+    return values, None
+
+
+# 首頁：依截止日期由早到晚排序
 @app.route("/")
 def index():
-    with get_db() as conn:
-        posts = conn.execute(
-            "SELECT * FROM posts ORDER BY id DESC"
-        ).fetchall()
+    assignments = get_db().execute("""
+        SELECT *
+        FROM assignments
+        ORDER BY deadline ASC, id ASC
+    """).fetchall()
 
-    return render_template("index.html", posts=posts)
-
-
-@app.route("/post/<int:post_id>")
-def post_detail(post_id):
-    post = get_post(post_id)
-    return render_template("post.html", post=post)
+    return render_template(
+        "index.html",
+        assignments=assignments,
+    )
 
 
+# 新增作業
 @app.route("/create", methods=["GET", "POST"])
-def create_post():
-    if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        author = request.form.get("author", "").strip()
-        content = request.form.get("content", "").strip()
+def create_assignment():
+    values = {
+        "course": "",
+        "task": "",
+        "deadline": "",
+    }
 
-        if not title or not author or not content:
+    if request.method == "POST":
+        values, error = validate_form()
+
+        if error:
             return render_template(
-                "create.html",
-                error="標題、作者、內容都必須填寫。",
-                title=title,
-                author=author,
-                content=content,
+                "form.html",
+                page_title="新增作業",
+                values=values,
+                error=error,
             ), 400
 
-        with get_db() as conn:
-            cursor = conn.execute(
-                """
-                INSERT INTO posts (title, author, content)
-                VALUES (?, ?, ?)
-                """,
-                (title, author, content),
-            )
-            post_id = cursor.lastrowid
+        db = get_db()
 
-        return redirect(url_for("post_detail", post_id=post_id))
+        db.execute("""
+            INSERT INTO assignments (course, task, deadline)
+            VALUES (?, ?, ?)
+        """, (
+            values["course"],
+            values["task"],
+            values["deadline"],
+        ))
+
+        db.commit()
+
+        return redirect(url_for("index"))
 
     return render_template(
-        "create.html",
-        title="",
-        author="",
-        content="",
+        "form.html",
+        page_title="新增作業",
+        values=values,
+        error=None,
     )
 
 
-@app.route("/edit/<int:post_id>", methods=["GET", "POST"])
-def edit_post(post_id):
-    post = get_post(post_id)
+# 編輯作業
+@app.route("/edit/<int:assignment_id>", methods=["GET", "POST"])
+def edit_assignment(assignment_id):
+    assignment = get_assignment(assignment_id)
+
+    values = {
+        "course": assignment["course"],
+        "task": assignment["task"],
+        "deadline": assignment["deadline"],
+    }
 
     if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        author = request.form.get("author", "").strip()
-        content = request.form.get("content", "").strip()
+        values, error = validate_form()
 
-        if not title or not author or not content:
+        if error:
             return render_template(
-                "edit.html",
-                post=post,
-                error="標題、作者、內容都必須填寫。",
-                title=title,
-                author=author,
-                content=content,
+                "form.html",
+                page_title="編輯作業",
+                values=values,
+                error=error,
             ), 400
 
-        with get_db() as conn:
-            conn.execute(
-                """
-                UPDATE posts
-                SET title = ?, author = ?, content = ?
-                WHERE id = ?
-                """,
-                (title, author, content, post_id),
-            )
+        db = get_db()
 
-        return redirect(url_for("post_detail", post_id=post_id))
+        db.execute("""
+            UPDATE assignments
+            SET course = ?, task = ?, deadline = ?
+            WHERE id = ?
+        """, (
+            values["course"],
+            values["task"],
+            values["deadline"],
+            assignment_id,
+        ))
+
+        db.commit()
+
+        return redirect(url_for("index"))
 
     return render_template(
-        "edit.html",
-        post=post,
-        title=post["title"],
-        author=post["author"],
-        content=post["content"],
+        "form.html",
+        page_title="編輯作業",
+        values=values,
+        error=None,
     )
 
 
-@app.route("/delete/<int:post_id>", methods=["POST"])
-def delete_post(post_id):
-    get_post(post_id)
+# 刪除作業，只接受 POST 請求
+@app.route("/delete/<int:assignment_id>", methods=["POST"])
+def delete_assignment(assignment_id):
+    get_assignment(assignment_id)
 
-    with get_db() as conn:
-        conn.execute(
-            "DELETE FROM posts WHERE id = ?",
-            (post_id,),
-        )
+    db = get_db()
+
+    db.execute(
+        "DELETE FROM assignments WHERE id = ?",
+        (assignment_id,),
+    )
+
+    db.commit()
 
     return redirect(url_for("index"))
 
 
 @app.errorhandler(404)
 def not_found(error):
-    return "找不到指定的文章。", 404
+    return "找不到指定的作業，請返回首頁。", 404
 
 
-init_db()
+# 使用 Gunicorn 啟動時，也會初始化資料表
+with app.app_context():
+    init_db()
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
