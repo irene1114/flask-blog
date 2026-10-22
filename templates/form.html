@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}｜作業管理系統{% endblock %}
+
+{% block content %}
+<h1>{{ page_title }}</h1>
+<p class="description">以下三個欄位皆為必填。</p>
+
+{% if error %}
+<p class="error" role="alert">{{ error }}</p>
+{% endif %}
+
+<form method="POST">
+    <label for="course">課程名稱</label>
+    <input
+        type="text"
+        id="course"
+        name="course"
+        value="{{ values['course'] }}"
+        placeholder="例如：雲端服務應用導論"
+        maxlength="100"
+        required
+    >
+
+    <label for="task">作業名稱</label>
+    <input
+        type="text"
+        id="task"
+        name="task"
+        value="{{ values['task'] }}"
+        placeholder="例如：HW2 Flask 作業管理系統"
+        maxlength="200"
+        required
+    >
+
+    <label for="deadline">截止日期</label>
+    <input
+        type="date"
+        id="deadline"
+        name="deadline"
+        value="{{ values['deadline'] }}"
+        required
+    >
+
+    <div class="form-actions">
+        <button type="submit">儲存作業</button>
+        <a href="{{ url_for('index') }}">取消</a>
+    </div>
+</form>
+{% endblock %}
