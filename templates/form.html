@@ -4,21 +4,21 @@
 
 {% block content %}
 <h1>{{ page_title }}</h1>
-<p class="description">以下三個欄位皆為必填。</p>
 
-{% if error %}
-<p class="error" role="alert">{{ error }}</p>
-{% endif %}
+<p>三個欄位皆為必填。</p>
+<p id="form-error" class="error" role="alert"></p>
 
-<form method="POST">
+<form
+    id="assignment-form"
+    data-id="{{ assignment.id if assignment else '' }}"
+>
     <label for="course">課程名稱</label>
     <input
         type="text"
         id="course"
         name="course"
-        value="{{ values['course'] }}"
-        placeholder="例如：雲端服務應用導論"
         maxlength="100"
+        value="{{ assignment.course if assignment else '' }}"
         required
     >
 
@@ -27,9 +27,8 @@
         type="text"
         id="task"
         name="task"
-        value="{{ values['task'] }}"
-        placeholder="例如：HW2 Flask 作業管理系統"
         maxlength="200"
+        value="{{ assignment.task if assignment else '' }}"
         required
     >
 
@@ -38,13 +37,31 @@
         type="date"
         id="deadline"
         name="deadline"
-        value="{{ values['deadline'] }}"
+        value="{{ assignment.deadline.isoformat() if assignment else '' }}"
         required
     >
 
-    <div class="form-actions">
+    <div class="actions">
         <button type="submit">儲存作業</button>
-        <a href="{{ url_for('index') }}">取消</a>
+
+        {% if assignment %}
+        <a
+            class="button secondary"
+            href="{{ url_for(
+                'detail_page',
+                assignment_id=assignment.id
+            ) }}"
+        >
+            取消
+        </a>
+        {% else %}
+        <a
+            class="button secondary"
+            href="{{ url_for('index') }}"
+        >
+            回到作業列表
+        </a>
+        {% endif %}
     </div>
 </form>
 {% endblock %}
