@@ -4,64 +4,26 @@
 
 {% block content %}
 <h1>作業管理系統</h1>
-<p class="description">
-    集中管理各科作業，依截止日期由早到晚排列。
-</p>
 
-{% if assignments %}
-<div class="table-wrap">
+<p>作業依截止日期由早到晚排列。</p>
+
+<a class="button" href="{{ url_for('create_page') }}">
+    新增作業
+</a>
+
+<p id="list-message" role="status">正在載入作業……</p>
+
+<div id="assignment-list" class="table-wrap" hidden>
     <table>
         <thead>
             <tr>
                 <th scope="col">課程名稱</th>
                 <th scope="col">作業名稱</th>
                 <th scope="col">截止日期</th>
-                <th scope="col">操作</th>
             </tr>
         </thead>
 
-        <tbody>
-            {% for assignment in assignments %}
-            <tr>
-                <td>{{ assignment['course'] }}</td>
-                <td>{{ assignment['task'] }}</td>
-                <td class="deadline">
-                    {{ assignment['deadline'] }}
-                </td>
-                <td>
-                    <div class="actions">
-                        <a href="{{ url_for(
-                            'edit_assignment',
-                            assignment_id=assignment['id']
-                        ) }}">
-                            編輯
-                        </a>
-
-                        <form
-                            method="POST"
-                            action="{{ url_for(
-                                'delete_assignment',
-                                assignment_id=assignment['id']
-                            ) }}"
-                            onsubmit="return confirm('確定要刪除這筆作業嗎？');"
-                        >
-                            <button type="submit" class="danger">
-                                刪除
-                            </button>
-                        </form>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
+        <tbody id="assignment-rows"></tbody>
     </table>
 </div>
-{% else %}
-<div class="empty">
-    <p>目前沒有作業，先新增第一筆吧！</p>
-    <a class="button" href="{{ url_for('create_assignment') }}">
-        新增作業
-    </a>
-</div>
-{% endif %}
 {% endblock %}
