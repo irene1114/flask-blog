@@ -1,226 +1,212 @@
-import sqlite3
 from datetime import date
 from pathlib import Path
 
-from flask import (
-    Flask,
-    abort,
-    g,
-    redirect,
-    render_template,
-    request,
-    url_for,
-)
+from flask import Flask, jsonify, render_template, request, url_for
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 
 app = Flask(__name__)
 
-DATABASE = Path(__file__).resolve().parent / "homework.db"
+# 設定 SQLite 資料庫
+Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///assignments.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
 
 
-# 建立資料庫連線，同一次請求共用同一個連線
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
+# 作業資料模型
+class Assignment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    course = db.Column(db.String(100), nullable=False)
+    task = db.Column(db.String(200), nullable=False)
+    deadline = db.Column(db.Date, nullable=False)
 
-    return g.db
-
-
-# 請求結束後關閉連線
-@app.teardown_appcontext
-def close_db(error=None):
-    db = g.pop("db", None)
-
-    if db is not None:
-        db.close()
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "course": self.course,
+            "task": self.task,
+            "deadline": self.deadline.isoformat(),
+        }
 
 
-# 初始化資料表
-def init_db():
-    db = get_db()
+# 檢查使用者傳入的資料
+def validate_data():
+    data = request.get_json(silent=True)
 
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS assignments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            course TEXT NOT NULL,
-            task TEXT NOT NULL,
-            deadline TEXT NOT NULL
-        )
-    """)
+    if not isinstance(data, dict):
+        return None, "請提供 JSON 格式的資料。"
 
-    db.commit()
+    values = {}
 
+    for field in ("course", "task", "deadline"):
+        value = data.get(field)
 
-# 取得指定作業，找不到時回傳 404
-def get_assignment(assignment_id):
-    assignment = get_db().execute(
-        "SELECT * FROM assignments WHERE id = ?",
-        (assignment_id,),
-    ).fetchone()
+        if not isinstance(value, str) or not value.strip():
+            return None, "課程名稱、作業名稱及截止日期皆為必填。"
 
-    if assignment is None:
-        abort(404)
-
-    return assignment
-
-
-# 讀取表單並檢查輸入內容
-def validate_form():
-    values = {
-        "course": request.form.get("course", "").strip(),
-        "task": request.form.get("task", "").strip(),
-        "deadline": request.form.get("deadline", "").strip(),
-    }
-
-    if not all(values.values()):
-        return values, "課程名稱、作業名稱及截止日期都必須填寫。"
+        values[field] = value.strip()
 
     if len(values["course"]) > 100:
-        return values, "課程名稱最多只能輸入 100 個字。"
+        return None, "課程名稱最多 100 個字。"
 
     if len(values["task"]) > 200:
-        return values, "作業名稱最多只能輸入 200 個字。"
+        return None, "作業名稱最多 200 個字。"
 
     try:
-        # 統一儲存為 YYYY-MM-DD，確保日期排序正確
-        parsed_date = date.fromisoformat(values["deadline"])
-        values["deadline"] = parsed_date.isoformat()
+        parsed = date.fromisoformat(values["deadline"])
+
+        if parsed.isoformat() != values["deadline"]:
+            raise ValueError
+
+        values["deadline"] = parsed
     except ValueError:
-        return values, "請輸入有效的截止日期。"
+        return None, "截止日期必須是有效的 YYYY-MM-DD 日期。"
 
     return values, None
 
 
-# 首頁：依截止日期由早到晚排序
-@app.route("/")
+# ---------- 前端頁面 ----------
+
+# 作業列表頁面
+@app.get("/")
 def index():
-    assignments = get_db().execute("""
-        SELECT *
-        FROM assignments
-        ORDER BY deadline ASC, id ASC
-    """).fetchall()
-
-    return render_template(
-        "index.html",
-        assignments=assignments,
-    )
+    return render_template("index.html")
 
 
-# 新增作業
-@app.route("/create", methods=["GET", "POST"])
-def create_assignment():
-    values = {
-        "course": "",
-        "task": "",
-        "deadline": "",
-    }
-
-    if request.method == "POST":
-        values, error = validate_form()
-
-        if error:
-            return render_template(
-                "form.html",
-                page_title="新增作業",
-                values=values,
-                error=error,
-            ), 400
-
-        db = get_db()
-
-        db.execute("""
-            INSERT INTO assignments (course, task, deadline)
-            VALUES (?, ?, ?)
-        """, (
-            values["course"],
-            values["task"],
-            values["deadline"],
-        ))
-
-        db.commit()
-
-        return redirect(url_for("index"))
-
+# 新增作業頁面
+@app.get("/create")
+def create_page():
     return render_template(
         "form.html",
         page_title="新增作業",
-        values=values,
-        error=None,
+        assignment=None,
     )
 
 
-# 編輯作業
-@app.route("/edit/<int:assignment_id>", methods=["GET", "POST"])
-def edit_assignment(assignment_id):
-    assignment = get_assignment(assignment_id)
+# 單筆作業頁面
+@app.get("/assignments/<int:assignment_id>")
+def detail_page(assignment_id):
+    assignment = db.get_or_404(Assignment, assignment_id)
 
-    values = {
-        "course": assignment["course"],
-        "task": assignment["task"],
-        "deadline": assignment["deadline"],
-    }
+    return render_template(
+        "detail.html",
+        assignment=assignment,
+    )
 
-    if request.method == "POST":
-        values, error = validate_form()
 
-        if error:
-            return render_template(
-                "form.html",
-                page_title="編輯作業",
-                values=values,
-                error=error,
-            ), 400
-
-        db = get_db()
-
-        db.execute("""
-            UPDATE assignments
-            SET course = ?, task = ?, deadline = ?
-            WHERE id = ?
-        """, (
-            values["course"],
-            values["task"],
-            values["deadline"],
-            assignment_id,
-        ))
-
-        db.commit()
-
-        return redirect(url_for("index"))
+# 編輯作業頁面
+@app.get("/assignments/<int:assignment_id>/edit")
+def edit_page(assignment_id):
+    assignment = db.get_or_404(Assignment, assignment_id)
 
     return render_template(
         "form.html",
         page_title="編輯作業",
-        values=values,
-        error=None,
+        assignment=assignment,
     )
 
 
-# 刪除作業，只接受 POST 請求
-@app.route("/delete/<int:assignment_id>", methods=["POST"])
+# ---------- RESTful API ----------
+
+# Create：新增作業
+@app.post("/api/assignments")
+def create_assignment():
+    values, error = validate_data()
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    assignment = Assignment(**values)
+    db.session.add(assignment)
+    db.session.commit()
+
+    response = jsonify(assignment.to_dict())
+    response.status_code = 201
+    response.headers["Location"] = url_for(
+        "read_assignments",
+        assignment_id=assignment.id,
+    )
+
+    return response
+
+
+# Read：讀取列表或單筆作業
+@app.get("/api/assignments")
+@app.get("/api/assignments/<int:assignment_id>")
+def read_assignments(assignment_id=None):
+    if assignment_id is not None:
+        assignment = db.get_or_404(Assignment, assignment_id)
+        return jsonify(assignment.to_dict())
+
+    statement = db.select(Assignment).order_by(
+        Assignment.deadline.asc(),
+        Assignment.id.asc(),
+    )
+
+    assignments = db.session.execute(statement).scalars().all()
+
+    return jsonify([
+        assignment.to_dict()
+        for assignment in assignments
+    ])
+
+
+# Update：更新作業
+@app.put("/api/assignments/<int:assignment_id>")
+def update_assignment(assignment_id):
+    assignment = db.get_or_404(Assignment, assignment_id)
+
+    values, error = validate_data()
+
+    if error:
+        return jsonify({"error": error}), 400
+
+    assignment.course = values["course"]
+    assignment.task = values["task"]
+    assignment.deadline = values["deadline"]
+
+    db.session.commit()
+
+    return jsonify(assignment.to_dict())
+
+
+# Delete：刪除作業
+@app.delete("/api/assignments/<int:assignment_id>")
 def delete_assignment(assignment_id):
-    get_assignment(assignment_id)
+    assignment = db.get_or_404(Assignment, assignment_id)
 
-    db = get_db()
+    db.session.delete(assignment)
+    db.session.commit()
 
-    db.execute(
-        "DELETE FROM assignments WHERE id = ?",
-        (assignment_id,),
-    )
+    return "", 204
 
-    db.commit()
 
-    return redirect(url_for("index"))
-
+# ---------- 錯誤處理 ----------
 
 @app.errorhandler(404)
 def not_found(error):
-    return "找不到指定的作業，請返回首頁。", 404
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "找不到指定的作業或 API。"}), 404
+
+    return "找不到指定的作業或頁面，請返回首頁。", 404
 
 
-# 使用 Gunicorn 啟動時，也會初始化資料表
+@app.errorhandler(SQLAlchemyError)
+def database_error(error):
+    db.session.rollback()
+    app.logger.exception("資料庫操作失敗")
+
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "資料儲存失敗，請稍後再試。"}), 500
+
+    return "資料庫操作失敗，請稍後再試。", 500
+
+
+# 建立資料表
 with app.app_context():
-    init_db()
+    db.create_all()
 
 
 if __name__ == "__main__":
