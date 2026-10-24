@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}作業詳情｜作業管理系統{% endblock %}
+
+{% block content %}
+<h1>{{ assignment.task }}</h1>
+
+<dl>
+    <dt>課程名稱</dt>
+    <dd>{{ assignment.course }}</dd>
+
+    <dt>作業名稱</dt>
+    <dd>{{ assignment.task }}</dd>
+
+    <dt>截止日期</dt>
+    <dd>{{ assignment.deadline.isoformat() }}</dd>
+</dl>
+
+<p id="delete-error" class="error" role="alert"></p>
+
+<div class="actions">
+    <a class="button secondary" href="{{ url_for('index') }}">
+        回到作業列表
+    </a>
+
+    <a
+        class="button"
+        href="{{ url_for(
+            'edit_page',
+            assignment_id=assignment.id
+        ) }}"
+    >
+        編輯作業
+    </a>
+
+    <button
+        type="button"
+        id="delete-button"
+        class="danger"
+        data-id="{{ assignment.id }}"
+    >
+        刪除作業
+    </button>
+</div>
+{% endblock %}
